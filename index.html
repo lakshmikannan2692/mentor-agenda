@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mentor 1:1 – Simple Agenda</title>
+  <style>
+    :root{
+      --bg:#f2fbf6;          /* pastel green wash */
+      --panel:#ffffff;        /* cards */
+      --ink:#1f2937;          /* text */
+      --muted:#6b7280;        /* secondary text */
+      --brand:#22c55e;        /* green */
+      --brand-2:#a7f3d0;      /* mint */
+      --chip:#e2f7ed;         /* chip bg */
+      --border:#d1fae5;       /* soft border */
+      --warn:#fbbf24;         /* amber */
+      --danger:#ef4444;       /* red */
+      --blue:#60a5fa;         /* link */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif}
+
+    .wrap{max-width:1000px;margin:0 auto;padding:18px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .h1{font-weight:700;font-size:18px}
+    .sub{font-size:12px;color:var(--muted)}
+
+    .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;background:var(--chip);border:1px solid var(--border);font-weight:600}
+    .btn{border:1px solid var(--border);background:white;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn:hover{border-color:#bff3de}
+    .btn.primary{background:linear-gradient(90deg, var(--brand), #86efac);color:#053b1a;border:none}
+
+    .tabs{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+    .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:white;cursor:pointer;font-weight:600}
+    .tab.active{background:var(--brand-2);border-color:#b5f2da}
+
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px;margin:12px 0}
+    .card h2{margin:0 0 8px 0;font-size:16px}
+    .muted{color:var(--muted);font-size:12px}
+
+    input[type="text"], input[type="url"], textarea, input[type="date"], select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:white}
+    textarea{min-height:90px;resize:vertical}
+
+    /* Projects & Tasks */
+    .project{border:1px dashed var(--border);border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+    .proj-head{display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .tasks{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+    .task{display:grid;grid-template-columns:24px 1fr 140px 140px;gap:8px;align-items:start;border:1px solid var(--border);border-radius:10px;padding:8px;background:#fff}
+    .drag{cursor:grab;user-select:none}
+    .task .meta{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    @media (max-width:720px){ .task{grid-template-columns:24px 1fr} .task select.status, .task select.phase{grid-column:1 / -1} .task .meta{grid-template-columns:1fr} }
+
+    .status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--chip);font-size:12px}
+
+    .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+    .alink{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid var(--border);text-decoration:none;color:#065f46}
+
+    /* History list */
+    .history{display:flex;flex-direction:column;gap:8px}
+    .history .row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);padding:10px;border-radius:10px;background:#fff}
+
+    /* Print */
+    @media print{ .noprint{display:none !important} body{background:white} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="h1">Mentor 1:1 – Simple Agenda</div>
+        <div class="sub">Auto date/time • Projects with priorities • Grants • Next‑week plan • History</div>
+      </div>
+      <div class="bar noprint">
+        <span class="pill" id="now"></span>
+        <button class="btn" id="exportBtn">Export</button>
+        <button class="btn" id="importBtn">Import</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
+        <button class="btn" id="printBtn">Save PDF</button>
+        <button class="btn primary" id="archiveBtn" title="Save a snapshot for this week">Archive Week</button>
+      </div>
+    </header>
+
+    <div class="tabs noprint">
+      <div class="tab active" data-tab="projects">Projects</div>
+      <div class="tab" data-tab="grants">Grants</div>
+      <div class="tab" data-tab="next">Next Week Plan</div>
+      <div class="tab" data-tab="history">History</div>
+    </div>
+
+    <!-- Projects -->
+    <section class="card" id="tab-projects">
+      <h2>Projects</h2>
+      <div class="muted">Add projects. Inside each project, add tasks. Drag the handle to reorder by priority. Use status to mark Planned / In‑Progress / Blocked / Review / Completed.</div>
+      <div id="projects"></div>
+      <div class="bar noprint" style="margin-top:8px">
+        <input id="newProjectName" type="text" placeholder="Project name (e.g., HRV – Polar H10 pipeline)" style="flex:1">
+        <button class="btn" id="addProject">+ Add Project</button>
+      </div>
+    </section>
+
+    <!-- Grants -->
+    <section class="card" id="tab-grants" style="display:none">
+      <h2>Grants</h2>
+      <div class="muted">Track titles, mechanism, deadline, status, and notes.</div>
+      <div id="grants"></div>
+      <div class="bar noprint" style="margin-top:8px">
+        <input id="newGrantTitle" type="text" placeholder="Grant title (e.g., K99/R00 – Mental Fatigue in MCI)" style="flex:1">
+        <button class="btn" id="addGrant">+ Add Grant</button>
+      </div>
+    </section>
+
+    <!-- Next week -->
+    <section class="card" id="tab-next" style="display:none">
+      <h2>Next Week Plan</h2>
+      <div class="muted">Add or carry‑over items you plan to tackle before the next 1:1.</div>
+      <div id="nextWeek" class="tasks"></div>
+      <div class="bar noprint" style="margin-top:8px">
+        <button class="btn" id="carryFromProjects">← Carry from Projects (Planned/Blocked/Review)</button>
+        <button class="btn" id="addNext">+ Add Item</button>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section class="card" id="tab-history" style="display:none">
+      <h2>History</h2>
+      <div class="muted">Weekly snapshots saved via <b>Archive Week</b>. Load to view or restore.</div>
+      <div id="history" class="history"></div>
+    </section>
+
+    <footer class="muted" style="margin:16px 4px">Data saves automatically in your browser. Use Export/Import to move between devices.</footer>
+  </div>
+
+  <template id="tpl-project">
+    <div class="project">
+      <div class="proj-head">
+        <input class="pname" type="text" placeholder="Project name" />
+        <div class="bar">
+          <button class="btn addTask">+ Task</button>
+          <button class="btn delProj" title="Delete project">Delete</button>
+        </div>
+      </div>
+      <div class="links"></div>
+      <div class="bar" style="margin-top:6px">
+        <input class="linkLabel" type="text" placeholder="Add link label (e.g., Drive folder)" style="flex:1">
+        <input class="linkUrl" type="url" placeholder="https://…" style="flex:1">
+        <button class="btn addLink">Add Link</button>
+      </div>
+      <div class="tasks"></div>
+    </div>
+  </template>
+
+  <template id="tpl-task">
+    <div class="task" draggable="true">
+      <div class="drag">☰</div>
+      <input class="title" type="text" placeholder="Task title (e.g., Clean RR intervals)" />
+      <select class="status">
+        <option>Planned</option>
+        <option>In‑Progress</option>
+        <option>Blocked</option>
+        <option>Review</option>
+        <option>Completed</option>
+      </select>
+      <select class="phase">
+        <option value="">— Stage —</option>
+        <option>Design</option>
+        <option>Data Collection</option>
+        <option>Analysis</option>
+        <option>Writing</option>
+      </select>
+      <div class="meta">
+        <textarea class="progress" placeholder="Progress details (what’s done so far)"></textarea>
+        <textarea class="blockers" placeholder="Roadblocks & ideas to resolve"></textarea>
+        <div style="grid-column:1/-1">
+          <input class="reviewer" type="text" placeholder="Reviewer / who to loop in (optional)">
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-grant">
+    <div class="project">
+      <div class="proj-head">
+        <input class="gtitle" type="text" placeholder="Grant title" />
+        <div class="bar">
+          <button class="btn delGrant">Delete</button>
+        </div>
+      </div>
+      <div class="tasks">
+        <div class="task" style="grid-template-columns:1fr 180px 160px">
+          <input class="mech" type="text" placeholder="Mechanism (e.g., NIH K99/R00, R21, Foundation)">
+          <input class="deadline" type="date">
+          <select class="gstatus">
+            <option>Ideation</option>
+            <option>Drafting</option>
+            <option>Internal Review</option>
+            <option>PI Review</option>
+            <option>Submission Prep</option>
+            <option>Submitted</option>
+            <option>Decision</option>
+          </select>
+          <div class="meta">
+            <textarea class="gnotes" placeholder="Notes: aims, collaborators, budget, letters, biosketch, facilities…"></textarea>
+            <textarea class="gactions" placeholder="Action items for next week"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-next">
+    <div class="task" draggable="true">
+      <div class="drag">☰</div>
+      <input class="title" type="text" placeholder="Next week item" />
+      <select class="status">
+        <option>Planned</option>
+        <option>In‑Progress</option>
+        <option>Blocked</option>
+        <option>Review</option>
+        <option>Completed</option>
+      </select>
+      <select class="phase">
+        <option value="">— Stage —</option>
+        <option>Design</option>
+        <option>Data Collection</option>
+        <option>Analysis</option>
+        <option>Writing</option>
+      </select>
+      <div class="meta">
+        <textarea class="progress" placeholder="Details"></textarea>
+        <textarea class="blockers" placeholder="Roadblocks"></textarea>
+      </div>
+    </div>
+  </template>
+
+<script>
+(function(){
+  const $ = (s,ctx=document)=>ctx.querySelector(s);
+  const $$ = (s,ctx=document)=>Array.from(ctx.querySelectorAll(s));
+  const key = 'mentor_simple_agenda_v2';
+
+  // Tabs
+  $$('.tab').forEach(t=> t.addEventListener('click',()=>{
+    $$('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    ['projects','grants','next','history'].forEach(id=> $('#tab-'+id).style.display = (t.dataset.tab===id)?'block':'none');
+  }));
+
+  // Time pill
+  function tick(){ $('#now').textContent = new Date().toLocaleString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+  tick(); setInterval(tick, 1000*30);
+
+  // State helpers
+  const read = ()=>{ try{return JSON.parse(localStorage.getItem(key)||'{}');}catch(e){return{}} };
+  const write = (d)=> localStorage.setItem(key, JSON.stringify(d));
+  function collect(){
+    return {
+      projects: collectProjects(),
+      grants: collectGrants(),
+      next: collectList($('#nextWeek')),
+      ts: Date.now()
+    };
+  }
+
+  function populate(state){
+    // projects
+    $('#projects').innerHTML='';
+    (state.projects||[]).forEach(p=> addProject(p));
+    // grants
+    $('#grants').innerHTML='';
+    (state.grants||[]).forEach(g=> addGrant(g));
+    // next week
+    $('#nextWeek').innerHTML='';
+    (state.next||[]).forEach(item=> $('#nextWeek').appendChild(newTask($('#tpl-next'), item)));
+  }
+
+  // Export/Import/Print/Archive
+  $('#exportBtn').addEventListener('click',()=>{
+    const blob = new Blob([JSON.stringify(collect(),null,2)],{type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mentor_11_agenda.json';
+    a.click();
+  });
+  $('#importBtn').addEventListener('click',()=> $('#importFile').click());
+  $('#importFile').addEventListener('change', e=>{
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ()=>{ try{ const s=JSON.parse(r.result); populate(s); save(); }catch(err){ alert('Invalid JSON'); } };
+    r.readAsText(f);
+  });
+  $('#printBtn').addEventListener('click', ()=> window.print());
+
+  // Archive by ISO week key
+  $('#archiveBtn').addEventListener('click', ()=>{
+    const s = collect();
+    const d = new Date();
+    const wk = isoWeek(d);
+    const name = `${d.getFullYear()}‑W${String(wk).padStart(2,'0')} (${d.toLocaleDateString()})`;
+    const all = read();
+    all.history = all.history||[];
+    all.history.unshift({name, data:s, at: Date.now()});
+    write(all);
+    renderHistory(all.history);
+    alert('Archived this week! Check the History tab.');
+  });
+
+  function isoWeek(d){
+    const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    const day=(t.getUTCDay()+6)%7; t.setUTCDate(t.getUTCDate()-day+3);
+    const first=new Date(Date.UTC(t.getUTCFullYear(),0,4));
+    return 1+Math.round(((t-first)/86400000-3+((first.getUTCDay()+6)%7))/7);
+  }
+
+  // Projects
+  $('#addProject').addEventListener('click',()=> addProject());
+  function addProject(p={name:$('#newProjectName').value.trim(), links:[], tasks:[]}){
+    const tpl = $('#tpl-project');
+    const el = tpl.content.firstElementChild.cloneNode(true);
+    const name = $('.pname', el); name.value = p.name||'';
+    const linksWrap = $('.links', el);
+    (p.links||[]).forEach(l=> linksWrap.appendChild(linkPill(l)));
+
+    // Tasks
+    const tasks = $('.tasks', el);
+    (p.tasks||[]).forEach(t=> tasks.appendChild(newTask($('#tpl-task'), t)));
+
+    // Add link
+    $('.addLink', el).addEventListener('click',()=>{
+      const label = $('.linkLabel', el).value.trim();
+      const url = $('.linkUrl', el).value.trim();
+      if(label && url){ linksWrap.appendChild(linkPill({label,url})); $('.linkLabel', el).value=''; $('.linkUrl', el).value=''; save(); }
+    });
+
+    // Add task
+    $('.addTask', el).addEventListener('click',()=>{ tasks.appendChild(newTask($('#tpl-task'))); save(); });
+
+    // Delete project
+    $('.delProj', el).addEventListener('click',()=>{ if(confirm('Delete this project?')){ el.remove(); save(); }});
+
+    // Dragging within project
+    enableDrag(tasks);
+
+    $('#projects').appendChild(el);
+    $('#newProjectName').value='';
+    save();
+  }
+
+  function linkPill({label,url}){
+    const a = document.createElement('a');
+    a.href = url; a.target='_blank'; a.className='alink'; a.textContent = label; return a;
+  }
+
+  function newTask(template, data={}){
+    const el = template.content.firstElementChild.cloneNode(true);
+    $('.title', el).value = data.title||'';
+    $('.status', el).value = data.status||'Planned';
+    const ph = $('.phase', el); if(ph) ph.value = data.phase||'';
+    const pr = $('.progress', el); if(pr) pr.value = data.progress||'';
+    const bl = $('.blockers', el); if(bl) bl.value = data.blockers||'';
+    const rv = $('.reviewer', el); if(rv) rv.value = data.reviewer||'';
+
+    // Save on edits
+    $$('input, textarea, select', el).forEach(i=> i.addEventListener('input', debounce(save,150)));
+
+    el.addEventListener('dragstart', e=>{ el.classList.add('dragging'); e.dataTransfer.setData('text/plain',''); });
+    el.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); save(); });
+    return el;
+  }
+
+  function collectProjects(){
+    return $$('#projects .project').map(p=>({
+      name: $('.pname', p).value,
+      links: $$('.links .alink', p).map(a=>({label:a.textContent, url:a.href})),
+      tasks: collectList($('.tasks', p))
+    }));
+  }
+
+  function collectList(container){
+    return $$('.task', container).map(t=>({
+      title: $('.title', t).value||'',
+      status: $('.status', t).value||'Planned',
+      phase: $('.phase', t)? $('.phase', t).value: '',
+      progress: $('.progress', t)? $('.progress', t).value: '',
+      blockers: $('.blockers', t)? $('.blockers', t).value: '',
+      reviewer: $('.reviewer', t)? $('.reviewer', t).value: ''
+    }));
+  }
+
+  function collectGrants(){
+    return $$('#grants .project').map(g=>({
+      title: $('.gtitle', g).value,
+      mech: $('.mech', g).value,
+      deadline: $('.deadline', g).value,
+      status: $('.gstatus', g).value,
+      notes: $('.gnotes', g).value,
+      actions: $('.gactions', g).value
+    }));
+  }
+
+  function addGrant(g={title:$('#newGrantTitle').value.trim()}){
+    const el = $('#tpl-grant').content.firstElementChild.cloneNode(true);
+    $('.gtitle', el).value = g.title||'';
+    $('.mech', el).value = g.mech||'';
+    $('.deadline', el).value = g.deadline||'';
+    $('.gstatus', el).value = g.status||'Ideation';
+    $('.gnotes', el).value = g.notes||'';
+    $('.gactions', el).value = g.actions||'';
+
+    $('.delGrant', el).addEventListener('click',()=>{ if(confirm('Delete this grant?')){ el.remove(); save(); }});
+    $$('input, textarea, select', el).forEach(i=> i.addEventListener('input', debounce(save,150)));
+
+    $('#grants').appendChild(el);
+    $('#newGrantTitle').value='';
+    save();
+  }
+
+  function enableDrag(container){
+    container.addEventListener('dragover', e=>{
+      e.preventDefault();
+      const dragging = container.querySelector('.dragging');
+      const after = getDragAfterElement(container, e.clientY);
+      if(!after) container.appendChild(dragging); else container.insertBefore(dragging, after);
+    });
+  }
+  function getDragAfterElement(container, y){
+    const els = [...container.querySelectorAll('.task:not(.dragging)')];
+    return els.reduce((closest, child)=>{
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height/2;
+      if(offset < 0 && offset > closest.offset){ return { offset, element: child }; }
+      else return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  // Carry from projects to next week (non-completed)
+  $('#carryFromProjects').addEventListener('click',()=>{
+    const s = collect();
+    const flat = [];
+    (s.projects||[]).forEach(p=> (p.tasks||[]).forEach(t=>{ if(t.status!=='Completed'){ flat.push({...t}); }}));
+    $('#nextWeek').innerHTML='';
+    flat.forEach(t=> $('#nextWeek').appendChild(newTask($('#tpl-next'), t)));
+    save();
+  });
+
+  $('#addNext').addEventListener('click',()=>{ $('#nextWeek').appendChild(newTask($('#tpl-next'))); save(); });
+
+  function renderHistory(list){
+    const h = $('#history'); h.innerHTML='';
+    (list||[]).forEach((snap,i)=>{
+      const row = document.createElement('div'); row.className='row';
+      const left = document.createElement('div'); left.innerHTML = `<b>${snap.name}</b><div class="muted">Saved ${new Date(snap.at).toLocaleString()}</div>`;
+      const right = document.createElement('div'); right.className='bar';
+      const view = document.createElement('button'); view.className='btn'; view.textContent='View';
+      const restore = document.createElement('button'); restore.className='btn'; restore.textContent='Restore to current';
+      right.appendChild(view); right.appendChild(restore);
+      row.appendChild(left); row.appendChild(right);
+      h.appendChild(row);
+
+      view.addEventListener('click',()=>{
+        const w = window.open('', '_blank');
+        w.document.write('<pre>'+JSON.stringify(snap.data,null,2)+'</pre>');
+        w.document.close();
+      });
+      restore.addEventListener('click',()=>{ if(confirm('Replace current agenda with this archive?')){ populate(snap.data); save(); }});
+    });
+  }
+
+  const debounce=(fn,ms=200)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a),ms); } };
+  function save(){ const d=read(); const s=collect(); write({...d,...s}); }
+
+  // Init
+  const init = read();
+  populate(init);
+  renderHistory(init.history||[]);
+})();
+</script>
+</body>
+</html>
