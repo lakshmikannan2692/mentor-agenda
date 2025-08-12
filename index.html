@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mentor 1:1 – Simple Agenda</title>
   <style>
@@ -16,7 +19,9 @@
       --border:#d1fae5;       /* soft border */
       --warn:#fbbf24;         /* amber */
       --danger:#ef4444;       /* red */
-      --blue:#60a5fa;         /* link */
+      --blue:#2563eb;         /* link */
+      --p1:#dcfce7;           /* priority 1 bg */
+      --p1-border:#86efac;    /* priority 1 border */
     }
     *{box-sizing:border-box}
     html,body{height:100%}
@@ -32,6 +37,7 @@
     .btn{border:1px solid var(--border);background:white;padding:8px 12px;border-radius:10px;cursor:pointer;font-weight:600}
     .btn:hover{border-color:#bff3de}
     .btn.primary{background:linear-gradient(90deg, var(--brand), #86efac);color:#053b1a;border:none}
+    .btn.toggle.active{outline:2px solid var(--brand)}
 
     .tabs{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
     .tab{padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:white;cursor:pointer;font-weight:600}
@@ -41,45 +47,72 @@
     .card h2{margin:0 0 8px 0;font-size:16px}
     .muted{color:var(--muted);font-size:12px}
 
-    input[type="text"], input[type="url"], textarea, input[type="date"], select{width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:white}
+    input[type="text"], input[type="email"], input[type="url"], textarea, input[type="date"], select{
+      width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:white
+    }
     textarea{min-height:90px;resize:vertical}
 
     /* Projects & Tasks */
     .project{border:1px dashed var(--border);border-radius:12px;padding:12px;margin:10px 0;background:#fff}
     .proj-head{display:flex;gap:8px;align-items:center;justify-content:space-between}
     .tasks{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-    .task{display:grid;grid-template-columns:24px 1fr 140px 140px;gap:8px;align-items:start;border:1px solid var(--border);border-radius:10px;padding:8px;background:#fff}
-    .drag{cursor:grab;user-select:none}
-    .task .meta{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    @media (max-width:720px){ .task{grid-template-columns:24px 1fr} .task select.status, .task select.phase{grid-column:1 / -1} .task .meta{grid-template-columns:1fr} }
 
-    .status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;border:1px solid var(--border);background:var(--chip);font-size:12px}
+    .task{display:grid;grid-template-columns:34px 28px 1fr 140px 140px;gap:8px;align-items:start;border:1px solid var(--border);border-radius:10px;padding:8px;background:#fff}
+    .task.p1{background:var(--p1);border-color:var(--p1-border)}
+    .drag{cursor:grab;user-select:none}
+    .badge{display:flex;flex-direction:column;align-items:center;gap:2px}
+    .prio-badge{width:24px;height:24px;border-radius:999px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;background:var(--chip)}
+    .prev{font-size:11px;color:var(--muted)}
+    .task .meta{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    @media (max-width:720px){
+      .task{grid-template-columns:34px 28px 1fr}
+      .task select.status, .task select.phase, .task select.pgroup{grid-column:1 / -1}
+      .task .meta{grid-template-columns:1fr}
+    }
 
     .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-    .alink{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid var(--border);text-decoration:none;color:#065f46}
+    .alink{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid var(--border);text-decoration:none;color:var(--blue)}
 
-    /* History list */
     .history{display:flex;flex-direction:column;gap:8px}
     .history .row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);padding:10px;border-radius:10px;background:#fff}
 
-    /* Print */
     @media print{ .noprint{display:none !important} body{background:white} }
   </style>
 </head>
 <body>
+  <script>
+    // Auto cache-bust the plain URL once per session
+    (function(){
+      try{
+        const u = new URL(location.href);
+        if(!u.searchParams.has('v') && !sessionStorage.getItem('cache_busted')){
+          u.searchParams.set('v', Date.now());
+          sessionStorage.setItem('cache_busted','1');
+          location.replace(u.toString());
+        }
+      }catch(e){}
+    })();
+  </script>
+
   <div class="wrap">
     <header>
       <div>
         <div class="h1">Mentor 1:1 – Simple Agenda</div>
-        <div class="sub">Auto date/time • Projects with priorities • Grants • Next‑week plan • History</div>
+        <div class="sub">Auto date/time • Numbered priorities (1, 1.a/1.b) • Grants • Next‑week • History & comparison</div>
       </div>
       <div class="bar noprint">
         <span class="pill" id="now"></span>
+        <input id="mentorEmail" type="email" placeholder="Mentor email" style="min-width:220px">
+        <button class="btn toggle" id="filterP1" aria-pressed="false" title="Show only priority #1 items">Show P1 only</button>
         <button class="btn" id="exportBtn">Export</button>
         <button class="btn" id="importBtn">Import</button>
         <input id="importFile" type="file" accept="application/json" style="display:none" />
         <button class="btn" id="printBtn">Save PDF</button>
-        <button class="btn primary" id="archiveBtn" title="Save a snapshot for this week">Archive Week</button>
+        <button class="btn" id="copyFullBtn">Copy full</button>
+        <button class="btn" id="copyShortBtn">Copy short</button>
+        <button class="btn" id="sendShortBtn">Send short</button>
+        <button class="btn" id="meetingDoneBtn" title="Create & email the weekly summary">Meeting done</button>
+        <button class="btn primary" id="archiveBtn" title="Save a snapshot for this week (freezes priorities)">Archive Week</button>
       </div>
     </header>
 
@@ -93,10 +126,10 @@
     <!-- Projects -->
     <section class="card" id="tab-projects">
       <h2>Projects</h2>
-      <div class="muted">Add projects. Inside each project, add tasks. Drag the handle to reorder by priority. Use status to mark Planned / In‑Progress / Blocked / Review / Completed.</div>
+      <div class="muted">Add tasks; choose a <b>Priority Group</b> (1, 2, 3…). Multiple tasks can share “1” → they’ll label as 1.a, 1.b, etc. Drag ☰ to order within a group. Archiving preserves that week’s labels.</div>
       <div id="projects"></div>
       <div class="bar noprint" style="margin-top:8px">
-        <input id="newProjectName" type="text" placeholder="Project name (e.g., HRV – Polar H10 pipeline)" style="flex:1">
+        <input id="newProjectName" type="text" placeholder="Project name" style="flex:1">
         <button class="btn" id="addProject">+ Add Project</button>
       </div>
     </section>
@@ -104,10 +137,10 @@
     <!-- Grants -->
     <section class="card" id="tab-grants" style="display:none">
       <h2>Grants</h2>
-      <div class="muted">Track titles, mechanism, deadline, status, and notes.</div>
+      <div class="muted">Track title, mechanism, deadline, status, notes, and next actions.</div>
       <div id="grants"></div>
       <div class="bar noprint" style="margin-top:8px">
-        <input id="newGrantTitle" type="text" placeholder="Grant title (e.g., K99/R00 – Mental Fatigue in MCI)" style="flex:1">
+        <input id="newGrantTitle" type="text" placeholder="Grant title" style="flex:1">
         <button class="btn" id="addGrant">+ Add Grant</button>
       </div>
     </section>
@@ -115,10 +148,10 @@
     <!-- Next week -->
     <section class="card" id="tab-next" style="display:none">
       <h2>Next Week Plan</h2>
-      <div class="muted">Add or carry‑over items you plan to tackle before the next 1:1.</div>
+      <div class="muted">Add or carry‑over items; priority labeling works the same way (1, 1.a/1.b).</div>
       <div id="nextWeek" class="tasks"></div>
       <div class="bar noprint" style="margin-top:8px">
-        <button class="btn" id="carryFromProjects">← Carry from Projects (Planned/Blocked/Review)</button>
+        <button class="btn" id="carryFromProjects">← Carry from Projects (non‑Completed)</button>
         <button class="btn" id="addNext">+ Add Item</button>
       </div>
     </section>
@@ -126,26 +159,31 @@
     <!-- History -->
     <section class="card" id="tab-history" style="display:none">
       <h2>History</h2>
-      <div class="muted">Weekly snapshots saved via <b>Archive Week</b>. Load to view or restore.</div>
+      <div class="muted">“Archive Week” saves a snapshot. Each snapshot preserves that week’s priority labels for comparison.</div>
       <div id="history" class="history"></div>
     </section>
 
     <footer class="muted" style="margin:16px 4px">Data saves automatically in your browser. Use Export/Import to move between devices.</footer>
   </div>
 
+  <!-- Templates -->
   <template id="tpl-project">
     <div class="project">
       <div class="proj-head">
         <input class="pname" type="text" placeholder="Project name" />
         <div class="bar">
           <button class="btn addTask">+ Task</button>
+          <label class="btn" style="cursor:pointer">
+            Upload
+            <input class="uploadInput" type="file" multiple style="display:none" />
+          </label>
           <button class="btn delProj" title="Delete project">Delete</button>
         </div>
       </div>
       <div class="links"></div>
       <div class="bar" style="margin-top:6px">
-        <input class="linkLabel" type="text" placeholder="Add link label (e.g., Drive folder)" style="flex:1">
-        <input class="linkUrl" type="url" placeholder="https://…" style="flex:1">
+        <input class="linkLabel" type="text" placeholder="Link label" style="flex:1">
+        <input class="linkUrl" type="url" placeholder="https://" style="flex:1">
         <button class="btn addLink">Add Link</button>
       </div>
       <div class="tasks"></div>
@@ -154,8 +192,12 @@
 
   <template id="tpl-task">
     <div class="task" draggable="true">
-      <div class="drag">☰</div>
-      <input class="title" type="text" placeholder="Task title (e.g., Clean RR intervals)" />
+      <div class="drag" title="Drag to reorder">☰</div>
+      <div class="badge">
+        <div class="prio-badge" title="Current priority">–</div>
+        <div class="prev" title="Last week priority (if archived)"></div>
+      </div>
+      <input class="title" type="text" placeholder="Task title" />
       <select class="status">
         <option>Planned</option>
         <option>In‑Progress</option>
@@ -171,10 +213,18 @@
         <option>Writing</option>
       </select>
       <div class="meta">
-        <textarea class="progress" placeholder="Progress details (what’s done so far)"></textarea>
-        <textarea class="blockers" placeholder="Roadblocks & ideas to resolve"></textarea>
-        <div style="grid-column:1/-1">
-          <input class="reviewer" type="text" placeholder="Reviewer / who to loop in (optional)">
+        <textarea class="progress" placeholder=""></textarea>
+        <textarea class="blockers" placeholder=""></textarea>
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 200px;gap:8px;align-items:center">
+          <input class="reviewer" type="text" placeholder="Reviewer (optional)">
+          <select class="pgroup" title="Priority group">
+            <option value="">— Priority —</option>
+            <option value="1">Priority 1</option>
+            <option value="2">Priority 2</option>
+            <option value="3">Priority 3</option>
+            <option value="4">Priority 4</option>
+            <option value="5">Priority 5</option>
+          </select>
         </div>
       </div>
     </div>
@@ -189,8 +239,9 @@
         </div>
       </div>
       <div class="tasks">
-        <div class="task" style="grid-template-columns:1fr 180px 160px">
-          <input class="mech" type="text" placeholder="Mechanism (e.g., NIH K99/R00, R21, Foundation)">
+        <div class="task" style="grid-template-columns:34px 28px 1fr 180px 160px">
+          <div></div><div></div>
+          <input class="mech" type="text" placeholder="Mechanism">
           <input class="deadline" type="date">
           <select class="gstatus">
             <option>Ideation</option>
@@ -202,8 +253,8 @@
             <option>Decision</option>
           </select>
           <div class="meta">
-            <textarea class="gnotes" placeholder="Notes: aims, collaborators, budget, letters, biosketch, facilities…"></textarea>
-            <textarea class="gactions" placeholder="Action items for next week"></textarea>
+            <textarea class="gnotes" placeholder=""></textarea>
+            <textarea class="gactions" placeholder=""></textarea>
           </div>
         </div>
       </div>
@@ -213,7 +264,11 @@
   <template id="tpl-next">
     <div class="task" draggable="true">
       <div class="drag">☰</div>
-      <input class="title" type="text" placeholder="Next week item" />
+      <div class="badge">
+        <div class="prio-badge">–</div>
+        <div class="prev"></div>
+      </div>
+      <input class="title" type="text" placeholder="Item" />
       <select class="status">
         <option>Planned</option>
         <option>In‑Progress</option>
@@ -229,253 +284,527 @@
         <option>Writing</option>
       </select>
       <div class="meta">
-        <textarea class="progress" placeholder="Details"></textarea>
-        <textarea class="blockers" placeholder="Roadblocks"></textarea>
+        <textarea class="progress" placeholder=""></textarea>
+        <textarea class="blockers" placeholder=""></textarea>
+        <div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 200px;gap:8px;align-items:center">
+          <div></div>
+          <select class="pgroup" title="Priority group">
+            <option value="">— Priority —</option>
+            <option value="1">Priority 1</option>
+            <option value="2">Priority 2</option>
+            <option value="3">Priority 3</option>
+            <option value="4">Priority 4</option>
+            <option value="5">Priority 5</option>
+          </select>
+        </div>
       </div>
     </div>
   </template>
 
-<script>
-(function(){
-  const $ = (s,ctx=document)=>ctx.querySelector(s);
-  const $$ = (s,ctx=document)=>Array.from(ctx.querySelectorAll(s));
-  const key = 'mentor_simple_agenda_v2';
+  <script>
+    const $ = (s,ctx=document)=>ctx.querySelector(s);
+    const $$ = (s,ctx=document)=>Array.from(ctx.querySelectorAll(s));
+    const key = 'mentor_simple_agenda_v6';
 
-  // Tabs
-  $$('.tab').forEach(t=> t.addEventListener('click',()=>{
-    $$('.tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    ['projects','grants','next','history'].forEach(id=> $('#tab-'+id).style.display = (t.dataset.tab===id)?'block':'none');
-  }));
+    // Tabs
+    $$('.tab').forEach(t=> t.addEventListener('click',()=>{
+      $$('.tab').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      ['projects','grants','next','history'].forEach(id=> $('#tab-'+id).style.display = (t.dataset.tab===id)?'block':'none');
+    }));
 
-  // Time pill
-  function tick(){ $('#now').textContent = new Date().toLocaleString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
-  tick(); setInterval(tick, 1000*30);
+    // Time pill
+    function tick(){ $('#now').textContent = new Date().toLocaleString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
+    tick(); setInterval(tick, 1000*30);
 
-  // State helpers
-  const read = ()=>{ try{return JSON.parse(localStorage.getItem(key)||'{}');}catch(e){return{}} };
-  const write = (d)=> localStorage.setItem(key, JSON.stringify(d));
-  function collect(){
-    return {
-      projects: collectProjects(),
-      grants: collectGrants(),
-      next: collectList($('#nextWeek')),
-      ts: Date.now()
-    };
-  }
+    // Persistence helpers
+    const read = ()=>{ try{return JSON.parse(localStorage.getItem(key)||'{}');}catch(e){return{}} };
+    const write = (d)=> localStorage.setItem(key, JSON.stringify(d));
 
-  function populate(state){
-    // projects
-    $('#projects').innerHTML='';
-    (state.projects||[]).forEach(p=> addProject(p));
-    // grants
-    $('#grants').innerHTML='';
-    (state.grants||[]).forEach(g=> addGrant(g));
-    // next week
-    $('#nextWeek').innerHTML='';
-    (state.next||[]).forEach(item=> $('#nextWeek').appendChild(newTask($('#tpl-next'), item)));
-  }
+    function collect(){
+      return {
+        mentorEmail: $('#mentorEmail').value || '',
+        projects: collectProjects(),
+        grants: collectGrants(),
+        next: collectList($('#nextWeek')),
+        history: read().history || [],
+        ts: Date.now()
+      };
+    }
 
-  // Export/Import/Print/Archive
-  $('#exportBtn').addEventListener('click',()=>{
-    const blob = new Blob([JSON.stringify(collect(),null,2)],{type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'mentor_11_agenda.json';
-    a.click();
-  });
-  $('#importBtn').addEventListener('click',()=> $('#importFile').click());
-  $('#importFile').addEventListener('change', e=>{
-    const f = e.target.files[0]; if(!f) return;
-    const r = new FileReader();
-    r.onload = ()=>{ try{ const s=JSON.parse(r.result); populate(s); save(); }catch(err){ alert('Invalid JSON'); } };
-    r.readAsText(f);
-  });
-  $('#printBtn').addEventListener('click', ()=> window.print());
+    function populate(state){
+      $('#mentorEmail').value = state.mentorEmail || '';
+      // projects
+      $('#projects').innerHTML='';
+      (state.projects||[]).forEach(p=> addProject(p));
+      // grants
+      $('#grants').innerHTML='';
+      (state.grants||[]).forEach(g=> addGrant(g));
+      // next week
+      $('#nextWeek').innerHTML='';
+      (state.next||[]).forEach(item=> $('#nextWeek').appendChild(newTask($('#tpl-next'), item)));
+      computeAllPriorities();
+      updatePrevBadges();
+      renderHistory(state.history||[]);
+    }
 
-  // Archive by ISO week key
-  $('#archiveBtn').addEventListener('click', ()=>{
-    const s = collect();
-    const d = new Date();
-    const wk = isoWeek(d);
-    const name = `${d.getFullYear()}‑W${String(wk).padStart(2,'0')} (${d.toLocaleDateString()})`;
-    const all = read();
-    all.history = all.history||[];
-    all.history.unshift({name, data:s, at: Date.now()});
-    write(all);
-    renderHistory(all.history);
-    alert('Archived this week! Check the History tab.');
-  });
-
-  function isoWeek(d){
-    const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-    const day=(t.getUTCDay()+6)%7; t.setUTCDate(t.getUTCDate()-day+3);
-    const first=new Date(Date.UTC(t.getUTCFullYear(),0,4));
-    return 1+Math.round(((t-first)/86400000-3+((first.getUTCDay()+6)%7))/7);
-  }
-
-  // Projects
-  $('#addProject').addEventListener('click',()=> addProject());
-  function addProject(p={name:$('#newProjectName').value.trim(), links:[], tasks:[]}){
-    const tpl = $('#tpl-project');
-    const el = tpl.content.firstElementChild.cloneNode(true);
-    const name = $('.pname', el); name.value = p.name||'';
-    const linksWrap = $('.links', el);
-    (p.links||[]).forEach(l=> linksWrap.appendChild(linkPill(l)));
-
-    // Tasks
-    const tasks = $('.tasks', el);
-    (p.tasks||[]).forEach(t=> tasks.appendChild(newTask($('#tpl-task'), t)));
-
-    // Add link
-    $('.addLink', el).addEventListener('click',()=>{
-      const label = $('.linkLabel', el).value.trim();
-      const url = $('.linkUrl', el).value.trim();
-      if(label && url){ linksWrap.appendChild(linkPill({label,url})); $('.linkLabel', el).value=''; $('.linkUrl', el).value=''; save(); }
+    // Export/Import/Print
+    $('#exportBtn').addEventListener('click',()=>{
+      const blob = new Blob([JSON.stringify(collect(),null,2)],{type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'mentor_11_agenda.json';
+      a.click();
     });
-
-    // Add task
-    $('.addTask', el).addEventListener('click',()=>{ tasks.appendChild(newTask($('#tpl-task'))); save(); });
-
-    // Delete project
-    $('.delProj', el).addEventListener('click',()=>{ if(confirm('Delete this project?')){ el.remove(); save(); }});
-
-    // Dragging within project
-    enableDrag(tasks);
-
-    $('#projects').appendChild(el);
-    $('#newProjectName').value='';
-    save();
-  }
-
-  function linkPill({label,url}){
-    const a = document.createElement('a');
-    a.href = url; a.target='_blank'; a.className='alink'; a.textContent = label; return a;
-  }
-
-  function newTask(template, data={}){
-    const el = template.content.firstElementChild.cloneNode(true);
-    $('.title', el).value = data.title||'';
-    $('.status', el).value = data.status||'Planned';
-    const ph = $('.phase', el); if(ph) ph.value = data.phase||'';
-    const pr = $('.progress', el); if(pr) pr.value = data.progress||'';
-    const bl = $('.blockers', el); if(bl) bl.value = data.blockers||'';
-    const rv = $('.reviewer', el); if(rv) rv.value = data.reviewer||'';
-
-    // Save on edits
-    $$('input, textarea, select', el).forEach(i=> i.addEventListener('input', debounce(save,150)));
-
-    el.addEventListener('dragstart', e=>{ el.classList.add('dragging'); e.dataTransfer.setData('text/plain',''); });
-    el.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); save(); });
-    return el;
-  }
-
-  function collectProjects(){
-    return $$('#projects .project').map(p=>({
-      name: $('.pname', p).value,
-      links: $$('.links .alink', p).map(a=>({label:a.textContent, url:a.href})),
-      tasks: collectList($('.tasks', p))
-    }));
-  }
-
-  function collectList(container){
-    return $$('.task', container).map(t=>({
-      title: $('.title', t).value||'',
-      status: $('.status', t).value||'Planned',
-      phase: $('.phase', t)? $('.phase', t).value: '',
-      progress: $('.progress', t)? $('.progress', t).value: '',
-      blockers: $('.blockers', t)? $('.blockers', t).value: '',
-      reviewer: $('.reviewer', t)? $('.reviewer', t).value: ''
-    }));
-  }
-
-  function collectGrants(){
-    return $$('#grants .project').map(g=>({
-      title: $('.gtitle', g).value,
-      mech: $('.mech', g).value,
-      deadline: $('.deadline', g).value,
-      status: $('.gstatus', g).value,
-      notes: $('.gnotes', g).value,
-      actions: $('.gactions', g).value
-    }));
-  }
-
-  function addGrant(g={title:$('#newGrantTitle').value.trim()}){
-    const el = $('#tpl-grant').content.firstElementChild.cloneNode(true);
-    $('.gtitle', el).value = g.title||'';
-    $('.mech', el).value = g.mech||'';
-    $('.deadline', el).value = g.deadline||'';
-    $('.gstatus', el).value = g.status||'Ideation';
-    $('.gnotes', el).value = g.notes||'';
-    $('.gactions', el).value = g.actions||'';
-
-    $('.delGrant', el).addEventListener('click',()=>{ if(confirm('Delete this grant?')){ el.remove(); save(); }});
-    $$('input, textarea, select', el).forEach(i=> i.addEventListener('input', debounce(save,150)));
-
-    $('#grants').appendChild(el);
-    $('#newGrantTitle').value='';
-    save();
-  }
-
-  function enableDrag(container){
-    container.addEventListener('dragover', e=>{
-      e.preventDefault();
-      const dragging = container.querySelector('.dragging');
-      const after = getDragAfterElement(container, e.clientY);
-      if(!after) container.appendChild(dragging); else container.insertBefore(dragging, after);
+    $('#importBtn').addEventListener('click',()=> $('#importFile').click());
+    $('#importFile').addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return;
+      const r = new FileReader();
+      r.onload = ()=>{ try{ const s=JSON.parse(r.result); populate(s); save(); }catch(err){ alert('Invalid JSON'); } };
+      r.readAsText(f);
     });
-  }
-  function getDragAfterElement(container, y){
-    const els = [...container.querySelectorAll('.task:not(.dragging)')];
-    return els.reduce((closest, child)=>{
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height/2;
-      if(offset < 0 && offset > closest.offset){ return { offset, element: child }; }
-      else return closest;
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
+    $('#printBtn').addEventListener('click', ()=> window.print());
 
-  // Carry from projects to next week (non-completed)
-  $('#carryFromProjects').addEventListener('click',()=>{
-    const s = collect();
-    const flat = [];
-    (s.projects||[]).forEach(p=> (p.tasks||[]).forEach(t=>{ if(t.status!=='Completed'){ flat.push({...t}); }}));
-    $('#nextWeek').innerHTML='';
-    flat.forEach(t=> $('#nextWeek').appendChild(newTask($('#tpl-next'), t)));
-    save();
-  });
-
-  $('#addNext').addEventListener('click',()=>{ $('#nextWeek').appendChild(newTask($('#tpl-next'))); save(); });
-
-  function renderHistory(list){
-    const h = $('#history'); h.innerHTML='';
-    (list||[]).forEach((snap,i)=>{
-      const row = document.createElement('div'); row.className='row';
-      const left = document.createElement('div'); left.innerHTML = `<b>${snap.name}</b><div class="muted">Saved ${new Date(snap.at).toLocaleString()}</div>`;
-      const right = document.createElement('div'); right.className='bar';
-      const view = document.createElement('button'); view.className='btn'; view.textContent='View';
-      const restore = document.createElement('button'); restore.className='btn'; restore.textContent='Restore to current';
-      right.appendChild(view); right.appendChild(restore);
-      row.appendChild(left); row.appendChild(right);
-      h.appendChild(row);
-
-      view.addEventListener('click',()=>{
-        const w = window.open('', '_blank');
-        w.document.write('<pre>'+JSON.stringify(snap.data,null,2)+'</pre>');
-        w.document.close();
+    // Priority 1 filter
+    $('#filterP1').addEventListener('click', (e)=>{
+      const btn = e.currentTarget;
+      const active = btn.getAttribute('aria-pressed') === 'true';
+      btn.setAttribute('aria-pressed', String(!active));
+      btn.classList.toggle('active');
+      applyP1Filter(!active);
+    });
+    function applyP1Filter(on){
+      $$('.tasks').forEach(list=>{
+        $$('.task', list).forEach(t=>{
+          const label = $('.prio-badge', t).textContent.trim();
+          const isP1 = label.startsWith('1');
+          if(on){ t.style.display = isP1 ? 'grid' : 'none'; t.classList.toggle('p1', isP1); }
+          else{ t.style.display='grid'; t.classList.toggle('p1', isP1); }
+        });
       });
-      restore.addEventListener('click',()=>{ if(confirm('Replace current agenda with this archive?')){ populate(snap.data); save(); }});
+    }
+
+    // Archive (freeze current priority labels for comparison)
+    $('#archiveBtn').addEventListener('click', ()=>{
+      computeAllPriorities();
+      const s = collect();
+      const d = new Date();
+      const wk = isoWeek(d);
+      const name = `${d.getFullYear()}‑W${String(wk).padStart(2,'0')} (${d.toLocaleDateString()})`;
+      // store priorityLabel + stable id for each task
+      s.projects.forEach(p=> p.tasks.forEach(t=>{ if(!t.priorityLabel) t.priorityLabel = ''; }));
+      s.next.forEach(t=>{ if(!t.priorityLabel) t.priorityLabel = ''; });
+      const all = read();
+      all.history = all.history||[];
+      all.history.unshift({name, data: JSON.parse(JSON.stringify(s)), at: Date.now()});
+      write(all);
+      renderHistory(all.history);
+      updatePrevBadges();
+      alert('Archived this week! Compare badges updated.');
     });
-  }
 
-  const debounce=(fn,ms=200)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a),ms); } };
-  function save(){ const d=read(); const s=collect(); write({...d,...s}); }
+    // Meeting done → full report preview + email
+    $('#meetingDoneBtn').addEventListener('click', ()=>{
+      computeAllPriorities(); updatePrevBadges();
+      const report = buildReport({mode:'full'});
+      showReportWindow(report);
+      openEmailDraft(report, 'Weekly 1:1 summary – ' + new Date().toLocaleDateString());
+    });
 
-  // Init
-  const init = read();
-  populate(init);
-  renderHistory(init.history||[]);
-})();
-</script>
+    // Send short → email only P1 + Next Week
+    $('#sendShortBtn').addEventListener('click', ()=>{
+      computeAllPriorities(); updatePrevBadges();
+      const report = buildReport({mode:'short'});
+      openEmailDraft(report, 'Short weekly focus – ' + new Date().toLocaleDateString());
+    });
+
+    // Copy buttons
+    $('#copyFullBtn').addEventListener('click', ()=>{
+      const report = buildReport({mode:'full'});
+      copyToClipboard(report);
+      alert('Full summary copied to clipboard.');
+    });
+    $('#copyShortBtn').addEventListener('click', ()=>{
+      const report = buildReport({mode:'short'});
+      copyToClipboard(report);
+      alert('Short summary copied to clipboard.');
+    });
+
+    function openEmailDraft(text, subject){
+      const email = ($('#mentorEmail').value||'').trim();
+      const subj = encodeURIComponent(subject);
+      const body = encodeURIComponent(text);
+      const href = `mailto:${encodeURIComponent(email)}?subject=${subj}&body=${body}`;
+      setTimeout(()=>{ location.href = href; }, 200);
+    }
+
+    function showReportWindow(report){
+      const w = window.open('', '_blank');
+      w.document.write(`<html><head><title>Weekly Summary</title></head><body><pre>${escapeHtml(report)}</pre></body></html>`);
+      w.document.close();
+    }
+
+    function buildReport({mode}){
+      const d = new Date();
+      let out = '';
+      out += `Mentor 1:1 Summary\n`;
+      out += `${d.toLocaleString()}\n\n`;
+
+      const includeP1Only = (mode==='short');
+
+      // Projects
+      $$('#projects .project').forEach(p=>{
+        const name = $('.pname', p).value || '(untitled project)';
+        let any = false;
+        const lines = [];
+        const tasks = $$('.task', p);
+        tasks.forEach(t=>{
+          const label = $('.prio-badge', t).textContent.trim(); if(!label) return;
+          const isP1 = label.startsWith('1');
+          if(includeP1Only && !isP1) return;
+          const prev = ($('.prev', t).textContent||'').trim();
+          const title = $('.title', t).value.trim();
+          const status = $('.status', t).value;
+          const phase = $('.phase', t).value;
+          const prog = ($('.progress', t).value||'').trim();
+          const block = ($('.blockers', t).value||'').trim();
+          lines.push(`  ${label}${prev?` (was ${prev})`:''} — ${title} [${status}${phase?`, ${phase}`:''}]`);
+          if(mode==='full'){
+            if(prog) lines.push(`    Progress: ${prog}`);
+            if(block) lines.push(`    Roadblocks: ${block}`);
+          }
+          any = true;
+        });
+        if(any){
+          out += `Project: ${name}\n`;
+          const links = $$('.links .alink', p).map(a=>`- ${a.textContent}: ${a.href}`).join('\n');
+          if(mode==='full' && links) out += links + '\n';
+          out += lines.join('\n') + '\n\n';
+        }
+      });
+
+      // Next Week Plan (always included)
+      const nxt = $$('#nextWeek .task');
+      if(nxt.length){
+        out += `Next Week Plan\n`;
+        nxt.forEach(t=>{
+          const label = $('.prio-badge', t).textContent.trim() || '–';
+          const title = $('.title', t).value.trim();
+          const status = $('.status', t).value;
+          const phase = $('.phase', t).value;
+          const prog = ($('.progress', t).value||'').trim();
+          const block = ($('.blockers', t).value||'').trim();
+          out += `  ${label} — ${title} [${status}${phase?`, ${phase}`:''}]\n`;
+          if(mode==='full'){
+            if(prog) out += `    Details: ${prog}\n`;
+            if(block) out += `    Roadblocks: ${block}\n`;
+          }
+        });
+        out += `\n`;
+      }
+
+      // Grants (only in full)
+      if(mode==='full'){
+        const gs = $$('#grants .project');
+        if(gs.length){
+          out += `Grants\n`;
+          gs.forEach(g=>{
+            const t = $('.gtitle', g).value||'(untitled)';
+            const mech = $('.mech', g).value||'';
+            const dl = $('.deadline', g).value||'';
+            const st = $('.gstatus', g).value||'';
+            const notes = ($('.gnotes', g).value||'').trim();
+            const actions = ($('.gactions', g).value||'').trim();
+            out += `  ${t} — ${mech}${dl?` (deadline ${dl})`:''} [${st}]\n`;
+            if(notes) out += `    Notes: ${notes}\n`;
+            if(actions) out += `    Next: ${actions}\n`;
+          });
+          out += `\n`;
+        }
+      }
+      return out || 'Summary is empty.';
+    }
+
+    function copyToClipboard(text){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).catch(()=> fallbackCopy(text));
+      }else{
+        fallbackCopy(text);
+      }
+    }
+    function fallbackCopy(text){
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+    }
+
+    function escapeHtml(s){ return s.replace(/[&<>\"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+    function isoWeek(d){
+      const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+      const day=(t.getUTCDay()+6)%7; t.setUTCDate(t.getUTCDate()-day+3);
+      const first=new Date(Date.UTC(t.getUTCFullYear(),0,4));
+      return 1+Math.round(((t-first)/86400000-3+((first.getUTCDay()+6)%7))/7);
+    }
+
+    // Projects
+    $('#addProject').addEventListener('click',()=> addProject());
+    function addProject(p={name:$('#newProjectName').value.trim(), links:[], tasks:[]}){
+      const tpl = $('#tpl-project');
+      const el = tpl.content.firstElementChild.cloneNode(true);
+      $('.pname', el).value = p.name||'';
+      const linksWrap = $('.links', el);
+      (p.links||[]).forEach(l=> linksWrap.appendChild(linkPill(l)));
+
+      // uploads → small inline data URLs (for quick sharing)
+      const up = $('.uploadInput', el);
+      up.addEventListener('change', async (ev)=>{
+        for(const file of ev.target.files){
+          if(file.size > 2*1024*1024){ alert(`${file.name} is over 2MB; consider linking via Drive instead.`); continue; }
+          const url = await fileToDataURL(file);
+          linksWrap.appendChild(linkPill({label:`${file.name}`, url}));
+        }
+        save(); up.value='';
+      });
+
+      const tasks = $('.tasks', el);
+      (p.tasks||[]).forEach(t=> tasks.appendChild(newTask($('#tpl-task'), t)));
+
+      // Add link
+      $('.addLink', el).addEventListener('click',()=>{
+        const label = $('.linkLabel', el).value.trim();
+        const url = $('.linkUrl', el).value.trim();
+        if(label && url){ linksWrap.appendChild(linkPill({label,url})); $('.linkLabel', el).value=''; $('.linkUrl', el).value=''; save(); }
+      });
+
+      // Add task
+      $('.addTask', el).addEventListener('click',()=>{ tasks.appendChild(newTask($('#tpl-task'))); computePriorities(tasks); save(); updatePrevBadges(); });
+
+      // Delete project
+      $('.delProj', el).addEventListener('click',()=>{ if(confirm('Delete this project?')){ el.remove(); save(); }});
+
+      // Dragging within project
+      enableDrag(tasks);
+
+      $('#projects').appendChild(el);
+      $('#newProjectName').value='';
+      computePriorities(tasks);
+      save(); updatePrevBadges();
+    }
+
+    function fileToDataURL(file){
+      return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    }
+
+    function linkPill({label,url}){
+      const a = document.createElement('a');
+      a.href = url; a.target='_blank'; a.className='alink'; a.textContent = label; return a;
+    }
+
+    function uuid(){ return 't_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4); }
+
+    function newTask(template, data={}){
+      const el = template.content.firstElementChild.cloneNode(true);
+      el.dataset.id = data.id || uuid();
+      $('.title', el).value = data.title||'';
+      $('.status', el).value = data.status||'Planned';
+      const ph = $('.phase', el); if(ph) ph.value = data.phase||'';
+      const pr = $('.progress', el); if(pr) pr.value = data.progress||'';
+      const bl = $('.blockers', el); if(bl) bl.value = data.blockers||'';
+      const rv = $('.reviewer', el); if(rv) rv.value = data.reviewer||'';
+      const pg = $('.pgroup', el); if(pg) pg.value = data.pgroup||'';
+      if(data.priorityLabel){ el.dataset.priorityLabel = data.priorityLabel; }
+
+      // Save on edits
+      $$('input, textarea, select', el).forEach(i=> i.addEventListener('input', debounce(()=>{ computeAllPriorities(); save(); updatePrevBadges(); },150)));
+
+      el.addEventListener('dragstart', e=>{ el.classList.add('dragging'); e.dataTransfer.setData('text/plain',''); });
+      el.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); const parent = el.parentElement; computePriorities(parent); save(); updatePrevBadges(); });
+
+      return el;
+    }
+
+    function collectProjects(){
+      return $$('#projects .project').map(p=>({
+        name: $('.pname', p).value,
+        links: $$('.links .alink', p).map(a=>({label:a.textContent, url:a.href})),
+        tasks: collectList($('.tasks', p))
+      }));
+    }
+
+    function collectList(container){
+      return $$('.task', container).map(t=>({
+        id: t.dataset.id,
+        title: $('.title', t).value||'',
+        status: $('.status', t).value||'Planned',
+        phase: $('.phase', t)? $('.phase', t).value: '',
+        progress: $('.progress', t)? $('.progress', t).value: '',
+        blockers: $('.blockers', t)? $('.blockers', t).value: '',
+        reviewer: $('.reviewer', t)? $('.reviewer', t).value: '',
+        pgroup: $('.pgroup', t)? $('.pgroup', t).value: '',
+        priorityLabel: t.dataset.priorityLabel || ''
+      }));
+    }
+
+    function collectGrants(){
+      return $$('#grants .project').map(g=>({
+        title: $('.gtitle', g).value,
+        mech: $('.mech', g).value,
+        deadline: $('.deadline', g).value,
+        status: $('.gstatus', g).value,
+        notes: $('.gnotes', g).value,
+        actions: $('.gactions', g).value
+      }));
+    }
+
+    function addGrant(g={title:$('#newGrantTitle').value.trim()}){
+      const el = $('#tpl-grant').content.firstElementChild.cloneNode(true);
+      $('.gtitle', el).value = g.title||'';
+      $('.mech', el).value = g.mech||'';
+      $('.deadline', el).value = g.deadline||'';
+      $('.gstatus', el).value = g.status||'Ideation';
+      $('.gnotes', el).value = g.notes||'';
+      $('.gactions', el).value = g.actions||'';
+
+      $('.delGrant', el).addEventListener('click',()=>{ if(confirm('Delete this grant?')){ el.remove(); save(); }});
+      $$('input, textarea, select', el).forEach(i=> i.addEventListener('input', debounce(()=>{ save(); },150)));
+
+      $('#grants').appendChild(el);
+      $('#newGrantTitle').value='';
+      save();
+    }
+
+    function enableDrag(container){
+      container.addEventListener('dragover', e=>{
+        e.preventDefault();
+        const dragging = container.querySelector('.dragging');
+        const after = getDragAfterElement(container, e.clientY);
+        if(!after) container.appendChild(dragging); else container.insertBefore(dragging, after);
+        computePriorities(container);
+      });
+    }
+    function getDragAfterElement(container, y){
+      const els = [...container.querySelectorAll('.task:not(.dragging)')];
+      return els.reduce((closest, child)=>{
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height/2;
+        if(offset < 0 && offset > closest.offset){ return { offset, element: child }; }
+        else return closest;
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    // Carry from projects to next week (non-completed)
+    $('#carryFromProjects').addEventListener('click',()=>{
+      computeAllPriorities();
+      const s = collect();
+      const flat = [];
+      (s.projects||[]).forEach(p=> (p.tasks||[]).forEach(t=>{ if(t.status!=='Completed'){ flat.push({...t}); }}));
+      $('#nextWeek').innerHTML='';
+      flat.forEach(t=> $('#nextWeek').appendChild(newTask($('#tpl-next'), t)));
+      computePriorities($('#nextWeek'));
+      save(); updatePrevBadges();
+    });
+
+    $('#addNext').addEventListener('click',()=>{ $('#nextWeek').appendChild(newTask($('#tpl-next'))); computePriorities($('#nextWeek')); save(); updatePrevBadges(); });
+
+    // Priority computation (grouped → 1, 1.a, 1.b ...)
+    function computeAllPriorities(){
+      $$('#projects .project .tasks').forEach(container=> computePriorities(container));
+      computePriorities($('#nextWeek'));
+    }
+    function computePriorities(container){
+      if(!container) return;
+      const tasks = $$('.task', container);
+      // group by pgroup preserving DOM order
+      const groups = {};
+      tasks.forEach(t=>{
+        const g = ($('.pgroup', t)?.value)||'';
+        (groups[g] = groups[g] || []).push(t);
+      });
+      const ordered = Object.keys(groups)
+        .filter(k=>k!=='')
+        .map(k=>parseInt(k,10))
+        .sort((a,b)=>a-b)
+        .map(n=>String(n));
+
+      // reset styles
+      tasks.forEach(t=> t.classList.remove('p1'));
+
+      // assign labels per group
+      ordered.forEach(g=>{
+        const list = groups[g];
+        list.forEach((t,idx)=>{
+          const label = list.length>1 ? `${g}.${String.fromCharCode(97+idx)}` : g;
+          $('.prio-badge', t).textContent = label;
+          t.dataset.priorityLabel = label;
+          if(g==='1'){ t.classList.add('p1'); }
+        });
+      });
+
+      // items with no group
+      (groups['']||[]).forEach(t=>{ $('.prio-badge',t).textContent='–'; t.dataset.priorityLabel=''; });
+    }
+
+    // History rendering
+    function renderHistory(list){
+      const h = $('#history'); h.innerHTML='';
+      (list||[]).forEach((snap)=>{
+        const row = document.createElement('div'); row.className='row';
+        const left = document.createElement('div'); left.innerHTML = `<b>${snap.name}</b><div class="muted">Saved ${new Date(snap.at).toLocaleString()}</div>`;
+        const right = document.createElement('div'); right.className='bar';
+        const view = document.createElement('button'); view.className='btn'; view.textContent='View';
+        const restore = document.createElement('button'); restore.className='btn'; restore.textContent='Restore to current';
+        right.appendChild(view); right.appendChild(restore);
+        row.appendChild(left); row.appendChild(right);
+        h.appendChild(row);
+
+        view.addEventListener('click',()=>{
+          const w = window.open('', '_blank');
+          w.document.write('<h3>'+snap.name+'</h3>');
+          (snap.data.projects||[]).forEach(p=>{
+            w.document.write('<h4>Project: '+(p.name||'(untitled)')+'</h4><ol>');
+            (p.tasks||[]).forEach(t=>{
+              const pl = t.priorityLabel || '?';
+              w.document.write('<li><b>'+pl+'</b> '+(t.title||'')+' — '+(t.status||'')+'</li>');
+            });
+            w.document.write('</ol>');
+          });
+          if((snap.data.next||[]).length){
+            w.document.write('<h4>Next Week snapshot</h4><ol>');
+            (snap.data.next||[]).forEach(t=>{
+              const pl = t.priorityLabel || '?';
+              w.document.write('<li><b>'+pl+'</b> '+(t.title||'')+' — '+(t.status||'')+'</li>');
+            });
+            w.document.write('</ol>');
+          }
+          w.document.close();
+        });
+        restore.addEventListener('click',()=>{ if(confirm('Replace current agenda with this archive?')){ populate(snap.data); save(); } });
+      });
+    }
+
+    // Compare-to-last-week badges (shows "was X")
+    function updatePrevBadges(){
+      const hist = (read().history||[]);
+      if(!hist.length) { $$('.prev').forEach(e=> e.textContent=''); return; }
+      const last = hist[0].data; // most recent snapshot
+      const prevIndex = new Map();
+      (last.projects||[]).forEach(p=> (p.tasks||[]).forEach(t=>{ if(t.id) prevIndex.set(t.id, t.priorityLabel||''); }));
+      (last.next||[]).forEach(t=>{ if(t.id) prevIndex.set(t.id, t.priorityLabel||''); });
+
+      $$('.task').forEach(t=>{
+        const id = t.dataset.id; const prev = prevIndex.get(id);
+        const el = $('.prev', t);
+        el.textContent = prev ? `was ${prev}` : '';
+      });
+    }
+
+    const debounce=(fn,ms=200)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn.apply(this,a),ms); } };
+    function save(){ const d=read(); const s=collect(); write({...d,...s}); }
+
+    // Init
+    const init = read();
+    populate(init);
+  </script>
 </body>
 </html>
